@@ -31,16 +31,7 @@ st.markdown("""
     button[data-baseweb="tab"] {font-size: 18px !important; font-weight: 700 !important; padding: 20px !important;}
     .stFileUploader { padding: 15px; background-color: #f1f5f9; border-radius: 10px; border: 2px dashed #cbd5e1; margin-bottom: 20px;}
     
-    /* 🔥 [디자인 수정] 필터(멀티셀렉트) 선택 시 예쁜 남색 톤으로 변경 및 굵은 글씨 적용 */
-    span[data-baseweb="tag"] {
-        background-color: #e0e7ff !important; 
-        color: #3730a3 !important; 
-        font-weight: 800 !important; 
-        font-size: 14px !important;
-        border-radius: 6px !important;
-        border: 1px solid #c7d2fe !important;
-    }
-    /* 라디오 버튼 강조 */
+    span[data-baseweb="tag"] { background-color: #e0e7ff !important; color: #3730a3 !important; font-weight: 800 !important; font-size: 14px !important; border-radius: 6px !important; border: 1px solid #c7d2fe !important; }
     div[role="radiogroup"] { padding: 5px; background-color: #f8fafc; border-radius: 8px;}
 </style>
 """, unsafe_allow_html=True)
@@ -68,7 +59,6 @@ def load_data(uploaded_files):
         df = df.dropna(subset=['전표번호'])
         df = df[~df['날짜'].astype(str).str.contains('합', na=False)]
         
-        # 🔥 [데이터 수정] 글라스미, 안경테, 안경렌즈 완벽 제외 로직
         exclude_keywords = ['글라스미', '안경테', '안경렌즈']
         for keyword in exclude_keywords:
             df = df[~df['상품명2'].fillna('').astype(str).str.contains(keyword)]
@@ -160,7 +150,8 @@ else:
     df, used_cust_col, used_phone_col = load_data(uploaded_files)
     
     st.sidebar.markdown("---")
-    compare_mode = st.sidebar.radio("🔍 컨설팅 분석 모드 선택", ["단일매장비교", "2개이상 매장 비교"])
+    # 🔥 [수정됨] 분석 모드 3가지로 개편
+    compare_mode = st.sidebar.radio("🔍 컨설팅 분석 모드 선택", ["단일 매장 조회", "단일 매장 기간 비교", "2개 이상 매장 비교"])
     st.sidebar.markdown("---")
 
     file_list = df['파일명'].unique().tolist()
@@ -172,7 +163,22 @@ else:
     views = []
     header_subtitle = ""
 
-    if compare_mode == "단일매장비교":
+    # 🔥 1. 단일 매장 조회 (신규 추가)
+    if compare_mode == "단일 매장 조회":
+        selected_store = st.sidebar.selectbox("🏪 대상 가맹점 선택 (1개)", store_list)
+        selected_months = st.sidebar.multiselect("📅 조회 기간 (월별)", month_list, default=[])
+        
+        p_ints = [int(m.replace('월', '')) for m in selected_months]
+        store_df = base_df[base_df['거래처(부서)'] == selected_store]
+        time_filtered_df = store_df[store_df['월'].isin(p_ints)] if p_ints else store_df
+        
+        period_text = ", ".join(selected_months) if selected_months else "전체 기간 (2026년)"
+        header_subtitle = f"단일 매장 조회 모드 | 대상 지점: {selected_store} | 기간: {period_text}"
+        
+        views.append({"title": f"🏪 {selected_store} 실적 ({period_text})", "df": time_filtered_df})
+
+    # 🔥 2. 단일 매장 기간 비교 (기존 유지)
+    elif compare_mode == "단일 매장 기간 비교":
         selected_store = st.sidebar.selectbox("🏪 대상 가맹점 선택 (1개)", store_list)
         period1 = st.sidebar.multiselect("📅 [비교 1] 기준 기간 (예: 1~4월)", month_list, default=["1월", "2월", "3월", "4월"])
         period2 = st.sidebar.multiselect("📅 [비교 2] 비교 기간 (예: 5~6월)", month_list, default=["5월", "6월", "7월", "8월"])
@@ -180,7 +186,7 @@ else:
         p1_ints = [int(m.replace('월', '')) for m in period1]
         p2_ints = [int(m.replace('월', '')) for m in period2]
         store_df = base_df[base_df['거래처(부서)'] == selected_store]
-        header_subtitle = f"단일매장비교 모드 | 대상 지점: {selected_store}"
+        header_subtitle = f"단일 매장 기간 비교 모드 | 대상 지점: {selected_store}"
         
         v1_df = store_df[store_df['월'].isin(p1_ints)] if p1_ints else store_df.iloc[0:0]
         v2_df = store_df[store_df['월'].isin(p2_ints)] if p2_ints else store_df.iloc[0:0]
@@ -191,6 +197,7 @@ else:
         views.append({"title": f"[{selected_store}] {t1}", "df": v1_df})
         views.append({"title": f"[{selected_store}] {t2}", "df": v2_df})
 
+    # 🔥 3. 2개 이상 매장 비교 (기존 유지)
     else:
         selected_stores = st.sidebar.multiselect("🏪 나란히 비교할 가맹점 (다중 선택)", store_list, default=store_list[:2] if store_list else [])
         selected_months = st.sidebar.multiselect("📅 전체 조회 기간 (월별)", month_list, default=[])
@@ -288,7 +295,6 @@ else:
                     st.markdown(f'<div class="metric-card border-violet"><div class="metric-label">조회 품목 수</div><div class="metric-value" style="font-size:16px;">{v_df["상품명2"].nunique():,} 개 품목 판매됨</div></div>', unsafe_allow_html=True)
 
                     def draw_view_chart(metric_name, max_y):
-                        # 🔥 [그래프 디자인 수정] 글씨 굵게, 크고 진하게
                         if metric_name == "마진율":
                             df_bar = lens_df.groupby('Custom_Channel').agg({'금액':'sum', '총마진':'sum'}).reset_index()
                             df_bar['마진율'] = df_bar.apply(lambda x: (x['총마진'] / x['금액'] * 100) if x['금액'] > 0 else 0, axis=1)
@@ -306,7 +312,7 @@ else:
                             textposition='outside', 
                             width=0.5, 
                             opacity=1.0,
-                            textfont=dict(size=14, color='#020617') # 글씨색 아주 진한 검정색으로
+                            textfont=dict(size=14, color='#020617')
                         )
                         fig_bar.update_layout(yaxis=dict(range=[0, max_y], showgrid=True, gridcolor='#f1f5f9', nticks=8), xaxis_title="", yaxis_title=y_title, margin=dict(l=10, r=10, t=25, b=10), showlegend=False, plot_bgcolor='white', paper_bgcolor='white')
                         st.plotly_chart(fig_bar, use_container_width=True)
@@ -324,12 +330,11 @@ else:
                         pie_data = pie_data[pie_data[pie_y] > 0]
                         if not pie_data.empty:
                             fig_pie = px.pie(pie_data, values=pie_y, names=pie_target, hole=0.5, color=pie_target, color_discrete_map=CATEGORY_COLORS)
-                            # 🔥 [원형 그래프 텍스트 수정] 크고 진하게
                             fig_pie.update_traces(
                                 textposition='inside', 
                                 textinfo='percent+label', 
                                 marker=dict(line=dict(color='#ffffff', width=2)),
-                                textfont=dict(size=15, color='#ffffff') # 흰색으로 또렷하게
+                                textfont=dict(size=15, color='#ffffff')
                             )
                             fig_pie.update_layout(margin=dict(l=10, r=10, t=10, b=10), showlegend=False, plot_bgcolor='white', paper_bgcolor='white')
                             st.plotly_chart(fig_pie, use_container_width=True)
@@ -430,7 +435,6 @@ else:
                         continue
                         
                     def draw_cust_view_chart(metric_name, max_y):
-                        # 🔥 [그래프 디자인 수정] 글씨 굵게, 크고 진하게
                         if metric_name == "마진율":
                             df_bar = target_df[target_df['Custom_Channel'] != '기타'].groupby('Custom_Channel').agg({'금액':'sum', '총마진':'sum'}).reset_index()
                             df_bar['마진율'] = df_bar.apply(lambda x: (x['총마진'] / x['금액'] * 100) if x['금액'] > 0 else 0, axis=1)
@@ -448,7 +452,7 @@ else:
                             textposition='outside', 
                             width=0.5, 
                             opacity=1.0,
-                            textfont=dict(size=14, color='#020617') # 글씨색 아주 진한 검정색으로
+                            textfont=dict(size=14, color='#020617')
                         )
                         fig_bar.update_layout(yaxis=dict(range=[0, max_y], showgrid=True, gridcolor='#f1f5f9', nticks=8), xaxis_title="", yaxis_title=y_title, margin=dict(l=10, r=10, t=25, b=10), showlegend=False, plot_bgcolor='white', paper_bgcolor='white')
                         st.plotly_chart(fig_bar, use_container_width=True)
@@ -466,12 +470,11 @@ else:
                         pie_data = pie_data[pie_data[pie_y] > 0]
                         if not pie_data.empty:
                             fig_pie = px.pie(pie_data, values=pie_y, names=pie_target, hole=0.5, color=pie_target, color_discrete_map=CATEGORY_COLORS)
-                            # 🔥 [원형 그래프 텍스트 수정] 크고 진하게
                             fig_pie.update_traces(
                                 textposition='inside', 
                                 textinfo='percent+label', 
                                 marker=dict(line=dict(color='#ffffff', width=2)),
-                                textfont=dict(size=15, color='#ffffff') # 흰색으로 또렷하게
+                                textfont=dict(size=15, color='#ffffff')
                             )
                             fig_pie.update_layout(margin=dict(l=10, r=10, t=10, b=10), showlegend=False, plot_bgcolor='white', paper_bgcolor='white')
                             st.plotly_chart(fig_pie, use_container_width=True)
