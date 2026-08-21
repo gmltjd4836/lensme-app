@@ -43,7 +43,8 @@ CATEGORY_COLORS = {
     '5,000원 병렌즈': '#8b5cf6', '10,000원': '#6366f1', '15,000원': '#0ea5e9',
     '20,000원': '#14b8a6', '25,000원': '#f43f5e', '30,000원': '#f97316',
     '4만원 이상': '#eab308', '원데이 10P': '#d946ef', '악마원데이': '#84cc16',
-    '투명렌즈': '#06b6d4', '부대용품': '#94a3b8', '기타(미분류)': '#cbd5e1'
+    '투명렌즈': '#06b6d4', '부대용품': '#94a3b8', '기타(미분류)': '#cbd5e1',
+    '근시용': '#3b82f6', '난시용': '#ef4444', '해당없음': '#94a3b8'
 }
 
 # 3. 데이터 로드 및 맵핑
@@ -97,7 +98,6 @@ def load_data(uploaded_files):
         
     combined_df = pd.concat(all_dfs, ignore_index=True)
 
-    # 🔥 [수정] 똑똑한 글로벌 투명/컬러 렌즈 사전 이식
     def determine_clear(row):
         g3, name = str(row['품목그룹3']), str(row['상품명2']).upper()
         if ('투명' in g3 or '클리어' in name) and '컬러' not in g3: return True
@@ -143,6 +143,19 @@ def load_data(uploaded_files):
         if row['is_clear_lens']: return '투명'
         else: return '컬러'
     combined_df['Color_Type'] = combined_df.apply(map_color_type, axis=1)
+
+    # 🔥 [추가] 근시용 / 난시용 구별 마법!
+    def map_vision_type(row):
+        name = str(row['상품명2']).upper()
+        # 부대용품은 근시/난시 해당 없음 처리
+        if row['Color_Type'] == '해당없음(부대용품)' or '기타' in row['Custom_Channel']:
+            return '해당없음'
+        # 이름에 난시, 토릭 관련 단어가 있으면 난시용
+        if any(kw in name for kw in ['난시', '토릭', '토리카', 'TORIC']):
+            return '난시용'
+        # 그 외 렌즈는 근시용(일반)
+        return '근시용'
+    combined_df['Vision_Type'] = combined_df.apply(map_vision_type, axis=1)
     
     return combined_df, cust_col_name, phone_col_name
 
@@ -222,7 +235,10 @@ else:
     color_options = ['컬러', '투명']
     selected_color_types = st.sidebar.multiselect("👁️ 렌즈 종류", color_options, default=[])
 
-    # 🔥 [수정] 클린핏 오투클리어가 '투명렌즈' 필터에도 마법처럼 불려오도록 세팅!
+    # 🔥 [추가] 사이드바에 근시/난시 필터 추가
+    vision_options = ['근시용', '난시용']
+    selected_vision_types = st.sidebar.multiselect("👓 도수 타입 (근시/난시)", vision_options, default=[])
+
     for v in views:
         if selected_channels: 
             v['df'] = v['df'][v['df']['Custom_Channel'].isin(selected_channels)]
@@ -235,6 +251,9 @@ else:
                 
         if selected_color_types: 
             v['df'] = v['df'][v['df']['Color_Type'].isin(selected_color_types)]
+
+        if selected_vision_types:
+            v['df'] = v['df'][v['df']['Vision_Type'].isin(selected_vision_types)]
 
     st.markdown(f"""
     <div class="header-banner">
@@ -331,6 +350,7 @@ else:
                         if len(selected_channels) >= 2: pie_target = 'Custom_Channel'
                         elif len(selected_prices) >= 2: pie_target = 'Price_Type'
                         elif len(selected_color_types) >= 1: pie_target = 'Color_Type'
+                        elif len(selected_vision_types) >= 1: pie_target = 'Vision_Type'
                         else: pie_target = 'Custom_Channel'
                         
                         df_pie_base = lens_df if metric_name == "마진율" else v_df
@@ -350,11 +370,12 @@ else:
                     if show_margin: draw_view_chart("마진율", global_max_margin)
 
                     st.markdown("<br><h4 style='color:#334155;'>📋 상세 실적 현황</h4>", unsafe_allow_html=True)
-                    table_df = v_df.groupby(['Custom_Channel', 'Color_Type', 'Price_Type', '상품명2']).agg(판매수량=('합계', 'sum'), 매출액=('금액', 'sum'), 총마진=('총마진', 'sum')).reset_index().sort_values(by=['매출액'], ascending=[False])
+                    # 🔥 [수정] 표에도 '도수타입' 열 추가
+                    table_df = v_df.groupby(['Custom_Channel', 'Color_Type', 'Vision_Type', 'Price_Type', '상품명2']).agg(판매수량=('합계', 'sum'), 매출액=('금액', 'sum'), 총마진=('총마진', 'sum')).reset_index().sort_values(by=['매출액'], ascending=[False])
                     table_df['총마진액(원)'] = table_df.apply(lambda x: '-' if x['Custom_Channel'] == '기타' else f"{int(x['총마진']):,}", axis=1)
                     table_df['마진율(%)'] = table_df.apply(lambda x: '-' if x['Custom_Channel'] == '기타' else f"{(x['총마진'] / x['매출액'] * 100 if x['매출액'] > 0 else 0):.1f}%", axis=1)
                     table_df = table_df.drop(columns=['총마진'])
-                    table_df.columns = ['카테고리', '렌즈종류', '금액 별 카테고리', '품목명', '판매수량(개)', '매출액(원)', '총마진액(원)', '마진율(%)']
+                    table_df.columns = ['카테고리', '렌즈종류', '도수타입', '금액 별 카테고리', '품목명', '판매수량(개)', '매출액(원)', '총마진액(원)', '마진율(%)']
                     st.dataframe(table_df.style.format({'판매수량(개)': '{:,.0f}', '매출액(원)': '{:,.0f}'}), use_container_width=True, height=350)
 
     # ==========================================
@@ -467,6 +488,7 @@ else:
                         if len(selected_channels) >= 2: pie_target = 'Custom_Channel'
                         elif len(selected_prices) >= 2: pie_target = 'Price_Type'
                         elif len(selected_color_types) >= 1: pie_target = 'Color_Type'
+                        elif len(selected_vision_types) >= 1: pie_target = 'Vision_Type'
                         else: pie_target = 'Custom_Channel'
                         
                         df_pie_base = target_df[target_df['Custom_Channel'] != '기타'] if metric_name == "마진율" else target_df
@@ -486,11 +508,12 @@ else:
                     if show_cust_margin: draw_cust_view_chart("마진율", g_max_c_margin)
 
                     st.markdown("<br><h4 style='color:#334155;'>📋 상세 구매 리스트</h4>", unsafe_allow_html=True)
-                    cust_table_df = target_df.groupby(['Custom_Channel', 'Price_Type', '상품명2']).agg(구매고객수=('고객명_정제', 'nunique'), 총판매수량=('합계', 'sum'), 매출액=('금액', 'sum'), 총마진=('총마진', 'sum')).reset_index().sort_values(by=['총판매수량'], ascending=[False])
+                    # 🔥 [수정] 표에도 '도수타입' 열 추가
+                    cust_table_df = target_df.groupby(['Custom_Channel', 'Vision_Type', 'Price_Type', '상품명2']).agg(구매고객수=('고객명_정제', 'nunique'), 총판매수량=('합계', 'sum'), 매출액=('금액', 'sum'), 총마진=('총마진', 'sum')).reset_index().sort_values(by=['총판매수량'], ascending=[False])
                     cust_table_df['총마진액(원)'] = cust_table_df.apply(lambda x: '-' if x['Custom_Channel'] == '기타' else f"{int(x['총마진']):,}", axis=1)
                     cust_table_df['마진율(%)'] = cust_table_df.apply(lambda x: '-' if x['Custom_Channel'] == '기타' else f"{(x['총마진'] / x['매출액'] * 100 if x['매출액'] > 0 else 0):.1f}%", axis=1)
                     cust_table_df = cust_table_df.drop(columns=['총마진'])
-                    cust_table_df.columns = ['카테고리', '금액 별 카테고리', '품목명', '구매고객(명)', '판매수량(개)', '매출액(원)', '총마진액(원)', '마진율(%)']
+                    cust_table_df.columns = ['카테고리', '도수타입', '금액 별 카테고리', '품목명', '구매고객(명)', '판매수량(개)', '매출액(원)', '총마진액(원)', '마진율(%)']
                     st.dataframe(cust_table_df.style.format({'구매고객(명)': '{:,.0f}', '판매수량(개)': '{:,.0f}', '매출액(원)': '{:,.0f}'}), use_container_width=True, height=350)
 
     # ==========================================
