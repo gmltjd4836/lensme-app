@@ -5,7 +5,7 @@ import os
 import glob
 
 # 1. 페이지 레이아웃 및 기본 설정
-st.set_page_config(page_title="렌즈미 매장 컨설팅 리포트", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="렌즈미 매장 컨설팅 리포트", page_icon="images/logo.png", layout="wide", initial_sidebar_state="expanded")
 
 # 2. 커스텀 CSS (디자인)
 st.markdown("""
@@ -31,6 +31,15 @@ st.markdown("""
     button[data-baseweb="tab"] {font-size: 18px !important; font-weight: 700 !important; padding: 20px !important;}
     .stFileUploader { padding: 15px; background-color: #f1f5f9; border-radius: 10px; border: 2px dashed #cbd5e1; margin-bottom: 20px;}
     
+    /* 🔥 [디자인 수정] 필터(멀티셀렉트) 선택 시 예쁜 남색 톤으로 변경 및 굵은 글씨 적용 */
+    span[data-baseweb="tag"] {
+        background-color: #e0e7ff !important; 
+        color: #3730a3 !important; 
+        font-weight: 800 !important; 
+        font-size: 14px !important;
+        border-radius: 6px !important;
+        border: 1px solid #c7d2fe !important;
+    }
     /* 라디오 버튼 강조 */
     div[role="radiogroup"] { padding: 5px; background-color: #f8fafc; border-radius: 8px;}
 </style>
@@ -58,6 +67,14 @@ def load_data(uploaded_files):
         df.columns = df.columns.str.strip()
         df = df.dropna(subset=['전표번호'])
         df = df[~df['날짜'].astype(str).str.contains('합', na=False)]
+        
+        # 🔥 [데이터 수정] 글라스미, 안경테, 안경렌즈 완벽 제외 로직
+        exclude_keywords = ['글라스미', '안경테', '안경렌즈']
+        for keyword in exclude_keywords:
+            df = df[~df['상품명2'].fillna('').astype(str).str.contains(keyword)]
+            df = df[~df['품목그룹1'].fillna('').astype(str).str.contains(keyword)]
+            df = df[~df['품목그룹3'].fillna('').astype(str).str.contains(keyword)]
+            df = df[~df['품목그룹4'].fillna('').astype(str).str.contains(keyword)]
         
         def to_num(series): return pd.to_numeric(series.astype(str).str.replace(',', ''), errors='coerce').fillna(0)
         
@@ -92,7 +109,7 @@ def load_data(uploaded_files):
 
     def map_channel(row):
         name, maker, g4 = str(row['상품명2']).upper(), str(row['생산업체']).upper(), str(row['품목그룹4']).upper()
-        if any(x in name for x in ['부대용품', '케이스', '리뉴', '바이오트루', '옵티프리', '액', '클렌미', '드롭', '더뷰', '세척기', '안경테']): return '기타'
+        if any(x in name for x in ['부대용품', '케이스', '리뉴', '바이오트루', '옵티프리', '액', '클렌미', '드롭', '더뷰', '세척기']): return '기타'
         if '트루핏' in name: return 'PB'
         if any(m in maker for m in ['존슨', '바슈롬', '알콘', '쿠퍼', '인터로조', '한국알콘']) or '글로벌' in g4: return '글로벌'
         if 'PB' in g4 or '단종(PB)' in g4: return 'PB'
@@ -102,7 +119,7 @@ def load_data(uploaded_files):
     def map_price(row):
         g1, name, g3 = str(row['품목그룹1']), str(row['상품명2']).upper(), str(row['품목그룹3'])
         is_clear = ('투명' in g3 or '클리어' in name) and '컬러' not in g3
-        if any(x in name for x in ['부대용품', '케이스', '리뉴', '바이오트루', '옵티프리', '액', '클렌미', '드롭', '더뷰', '세척기', '안경테']): return '부대용품'
+        if any(x in name for x in ['부대용품', '케이스', '리뉴', '바이오트루', '옵티프리', '액', '클렌미', '드롭', '더뷰', '세척기']): return '부대용품'
         if '토리카' in name or any(x in g1 for x in ['4만원', '5만원', '6만원', '8만원', '9만원', '12만원']): return '4만원 이상'
         if '악마' in name or '클린핏' in name or ('30P' in name and not is_clear and row['Custom_Channel'] != '글로벌'): return '악마원데이'
         if '10P' in name: return '원데이 10P'
@@ -143,7 +160,6 @@ else:
     df, used_cust_col, used_phone_col = load_data(uploaded_files)
     
     st.sidebar.markdown("---")
-    # 🔥 [수정] 분석 모드 필터 이름 변경
     compare_mode = st.sidebar.radio("🔍 컨설팅 분석 모드 선택", ["단일매장비교", "2개이상 매장 비교"])
     st.sidebar.markdown("---")
 
@@ -189,7 +205,6 @@ else:
 
     st.sidebar.markdown("---")
     
-    # 🔥 [수정] 사이드바 세부 필터 이름 변경
     channel_options = ['OEM', 'PB', '글로벌', '기타']
     selected_channels = st.sidebar.multiselect("📦 카테고리", channel_options, default=[])
     
@@ -211,11 +226,10 @@ else:
     </div>
     """, unsafe_allow_html=True)
 
-    # 🔥 [수정] 상단 탭 이름 변경
     tab_sales, tab_customer, tab_renewal = st.tabs(["📊 매출데이터", "👥 고객데이터", "✨ 리뉴얼"])
 
     # ==========================================
-    # [탭 1] 매출데이터 (기존 실적비교)
+    # [탭 1] 매출데이터
     # ==========================================
     with tab_sales:
         if not views:
@@ -274,20 +288,27 @@ else:
                     st.markdown(f'<div class="metric-card border-violet"><div class="metric-label">조회 품목 수</div><div class="metric-value" style="font-size:16px;">{v_df["상품명2"].nunique():,} 개 품목 판매됨</div></div>', unsafe_allow_html=True)
 
                     def draw_view_chart(metric_name, max_y):
+                        # 🔥 [그래프 디자인 수정] 글씨 굵게, 크고 진하게
                         if metric_name == "마진율":
                             df_bar = lens_df.groupby('Custom_Channel').agg({'금액':'sum', '총마진':'sum'}).reset_index()
                             df_bar['마진율'] = df_bar.apply(lambda x: (x['총마진'] / x['금액'] * 100) if x['금액'] > 0 else 0, axis=1)
-                            y_col, text_fmt, y_title = '마진율', '%{text:.1f}%', '마진율(%)'
+                            y_col, text_fmt, y_title = '마진율', '<b>%{text:.1f}%</b>', '마진율(%)'
                         else:
                             df_bar = v_df.groupby('Custom_Channel')['금액' if metric_name == '매출액' else '합계'].sum().reset_index()
                             y_col = '금액' if metric_name == '매출액' else '합계'
-                            text_fmt = '%{text:,.0f}원' if metric_name == '매출액' else '%{text:,.0f}개'
+                            text_fmt = '<b>%{text:,.0f}원</b>' if metric_name == '매출액' else '<b>%{text:,.0f}개</b>'
                             y_title = metric_name
 
                         st.markdown(f"<div style='margin-top:20px; font-weight:bold; color:#334155;'>📈 카테고리별 {metric_name} 추이</div>", unsafe_allow_html=True)
                         fig_bar = px.bar(df_bar, x='Custom_Channel', y=y_col, text=y_col, color='Custom_Channel', color_discrete_map=CATEGORY_COLORS)
-                        fig_bar.update_traces(texttemplate=text_fmt, textposition='outside', width=0.5, opacity=0.9)
-                        fig_bar.update_layout(yaxis=dict(range=[0, max_y], showgrid=True, gridcolor='#f1f5f9', nticks=8), xaxis_title="", yaxis_title=y_title, margin=dict(l=10, r=10, t=20, b=10), showlegend=False, plot_bgcolor='white', paper_bgcolor='white')
+                        fig_bar.update_traces(
+                            texttemplate=text_fmt, 
+                            textposition='outside', 
+                            width=0.5, 
+                            opacity=1.0,
+                            textfont=dict(size=14, color='#020617') # 글씨색 아주 진한 검정색으로
+                        )
+                        fig_bar.update_layout(yaxis=dict(range=[0, max_y], showgrid=True, gridcolor='#f1f5f9', nticks=8), xaxis_title="", yaxis_title=y_title, margin=dict(l=10, r=10, t=25, b=10), showlegend=False, plot_bgcolor='white', paper_bgcolor='white')
                         st.plotly_chart(fig_bar, use_container_width=True)
 
                         if len(selected_channels) >= 2: pie_target = 'Custom_Channel'
@@ -303,7 +324,13 @@ else:
                         pie_data = pie_data[pie_data[pie_y] > 0]
                         if not pie_data.empty:
                             fig_pie = px.pie(pie_data, values=pie_y, names=pie_target, hole=0.5, color=pie_target, color_discrete_map=CATEGORY_COLORS)
-                            fig_pie.update_traces(textposition='inside', textinfo='percent+label', marker=dict(line=dict(color='#ffffff', width=2)))
+                            # 🔥 [원형 그래프 텍스트 수정] 크고 진하게
+                            fig_pie.update_traces(
+                                textposition='inside', 
+                                textinfo='percent+label', 
+                                marker=dict(line=dict(color='#ffffff', width=2)),
+                                textfont=dict(size=15, color='#ffffff') # 흰색으로 또렷하게
+                            )
                             fig_pie.update_layout(margin=dict(l=10, r=10, t=10, b=10), showlegend=False, plot_bgcolor='white', paper_bgcolor='white')
                             st.plotly_chart(fig_pie, use_container_width=True)
 
@@ -316,12 +343,11 @@ else:
                     table_df['총마진액(원)'] = table_df.apply(lambda x: '-' if x['Custom_Channel'] == '기타' else f"{int(x['총마진']):,}", axis=1)
                     table_df['마진율(%)'] = table_df.apply(lambda x: '-' if x['Custom_Channel'] == '기타' else f"{(x['총마진'] / x['매출액'] * 100 if x['매출액'] > 0 else 0):.1f}%", axis=1)
                     table_df = table_df.drop(columns=['총마진'])
-                    # 🔥 [수정] 표 헤더명 변경
                     table_df.columns = ['카테고리', '렌즈종류', '금액 별 카테고리', '품목명', '판매수량(개)', '매출액(원)', '총마진액(원)', '마진율(%)']
                     st.dataframe(table_df.style.format({'판매수량(개)': '{:,.0f}', '매출액(원)': '{:,.0f}'}), use_container_width=True, height=350)
 
     # ==========================================
-    # [탭 2] 고객데이터 (기존 고객 재방문)
+    # [탭 2] 고객데이터
     # ==========================================
     with tab_customer:
         if not views:
@@ -404,20 +430,27 @@ else:
                         continue
                         
                     def draw_cust_view_chart(metric_name, max_y):
+                        # 🔥 [그래프 디자인 수정] 글씨 굵게, 크고 진하게
                         if metric_name == "마진율":
                             df_bar = target_df[target_df['Custom_Channel'] != '기타'].groupby('Custom_Channel').agg({'금액':'sum', '총마진':'sum'}).reset_index()
                             df_bar['마진율'] = df_bar.apply(lambda x: (x['총마진'] / x['금액'] * 100) if x['금액'] > 0 else 0, axis=1)
-                            y_col, text_fmt, y_title = '마진율', '%{text:.1f}%', '마진율(%)'
+                            y_col, text_fmt, y_title = '마진율', '<b>%{text:.1f}%</b>', '마진율(%)'
                         else:
                             df_bar = target_df.groupby('Custom_Channel')['금액' if metric_name == '매출액' else '합계'].sum().reset_index()
                             y_col = '금액' if metric_name == '매출액' else '합계'
-                            text_fmt = '%{text:,.0f}원' if metric_name == '매출액' else '%{text:,.0f}개'
+                            text_fmt = '<b>%{text:,.0f}원</b>' if metric_name == '매출액' else '<b>%{text:,.0f}개</b>'
                             y_title = metric_name
 
                         st.markdown(f"<div style='margin-top:20px; font-weight:bold; color:#334155;'>📈 카테고리별 {metric_name} 추이</div>", unsafe_allow_html=True)
                         fig_bar = px.bar(df_bar, x='Custom_Channel', y=y_col, text=y_col, color='Custom_Channel', color_discrete_map=CATEGORY_COLORS)
-                        fig_bar.update_traces(texttemplate=text_fmt, textposition='outside', width=0.5, opacity=0.9)
-                        fig_bar.update_layout(yaxis=dict(range=[0, max_y], showgrid=True, gridcolor='#f1f5f9', nticks=8), xaxis_title="", yaxis_title=y_title, margin=dict(l=10, r=10, t=20, b=10), showlegend=False, plot_bgcolor='white', paper_bgcolor='white')
+                        fig_bar.update_traces(
+                            texttemplate=text_fmt, 
+                            textposition='outside', 
+                            width=0.5, 
+                            opacity=1.0,
+                            textfont=dict(size=14, color='#020617') # 글씨색 아주 진한 검정색으로
+                        )
+                        fig_bar.update_layout(yaxis=dict(range=[0, max_y], showgrid=True, gridcolor='#f1f5f9', nticks=8), xaxis_title="", yaxis_title=y_title, margin=dict(l=10, r=10, t=25, b=10), showlegend=False, plot_bgcolor='white', paper_bgcolor='white')
                         st.plotly_chart(fig_bar, use_container_width=True)
 
                         if len(selected_channels) >= 2: pie_target = 'Custom_Channel'
@@ -433,7 +466,13 @@ else:
                         pie_data = pie_data[pie_data[pie_y] > 0]
                         if not pie_data.empty:
                             fig_pie = px.pie(pie_data, values=pie_y, names=pie_target, hole=0.5, color=pie_target, color_discrete_map=CATEGORY_COLORS)
-                            fig_pie.update_traces(textposition='inside', textinfo='percent+label', marker=dict(line=dict(color='#ffffff', width=2)))
+                            # 🔥 [원형 그래프 텍스트 수정] 크고 진하게
+                            fig_pie.update_traces(
+                                textposition='inside', 
+                                textinfo='percent+label', 
+                                marker=dict(line=dict(color='#ffffff', width=2)),
+                                textfont=dict(size=15, color='#ffffff') # 흰색으로 또렷하게
+                            )
                             fig_pie.update_layout(margin=dict(l=10, r=10, t=10, b=10), showlegend=False, plot_bgcolor='white', paper_bgcolor='white')
                             st.plotly_chart(fig_pie, use_container_width=True)
 
@@ -446,13 +485,11 @@ else:
                     cust_table_df['총마진액(원)'] = cust_table_df.apply(lambda x: '-' if x['Custom_Channel'] == '기타' else f"{int(x['총마진']):,}", axis=1)
                     cust_table_df['마진율(%)'] = cust_table_df.apply(lambda x: '-' if x['Custom_Channel'] == '기타' else f"{(x['총마진'] / x['매출액'] * 100 if x['매출액'] > 0 else 0):.1f}%", axis=1)
                     cust_table_df = cust_table_df.drop(columns=['총마진'])
-                    # 🔥 [수정] 표 헤더명 변경
                     cust_table_df.columns = ['카테고리', '금액 별 카테고리', '품목명', '구매고객(명)', '판매수량(개)', '매출액(원)', '총마진액(원)', '마진율(%)']
                     st.dataframe(cust_table_df.style.format({'구매고객(명)': '{:,.0f}', '판매수량(개)': '{:,.0f}', '매출액(원)': '{:,.0f}'}), use_container_width=True, height=350)
 
-
     # ==========================================
-    # 🔥 [탭 3] 리뉴얼 현황
+    # [탭 3] 리뉴얼 현황
     # ==========================================
     with tab_renewal:
         st.markdown("<h3 style='color: #0f172a; margin-bottom: 5px;'>✨ 매장 리뉴얼 및 인테리어 현황</h3>", unsafe_allow_html=True)
@@ -461,7 +498,6 @@ else:
         
         st.markdown(f"#### 🖼️ [{shop_type}] 매장 고정 갤러리")
         
-        # 🔥 [핵심 수정] 선택한 라디오 버튼에 따라 타겟 폴더를 다르게 설정합니다!
         if shop_type == "단독샵 (Standalone)":
             target_folder = os.path.join("images", "standalone")
         else:
