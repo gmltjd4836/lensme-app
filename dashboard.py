@@ -165,32 +165,25 @@ else:
     if compare_mode == "단일 매장 조회":
         selected_store = st.sidebar.selectbox("🏪 대상 가맹점 선택 (1개)", store_list)
         selected_months = st.sidebar.multiselect("📅 조회 기간 (월별)", month_list, default=[])
-        
         p_ints = [int(m.replace('월', '')) for m in selected_months]
         store_df = base_df[base_df['거래처(부서)'] == selected_store]
         time_filtered_df = store_df[store_df['월'].isin(p_ints)] if p_ints else store_df
-        
         period_text = ", ".join(selected_months) if selected_months else "전체 기간 (2026년)"
         header_subtitle = f"단일 매장 조회 모드 | 대상 지점: {selected_store} | 기간: {period_text}"
-        
         views.append({"title": f"🏪 {selected_store} 실적 ({period_text})", "df": time_filtered_df})
 
     elif compare_mode == "단일 매장 기간 비교":
         selected_store = st.sidebar.selectbox("🏪 대상 가맹점 선택 (1개)", store_list)
         period1 = st.sidebar.multiselect("📅 [비교 1] 기준 기간 (예: 1~4월)", month_list, default=["1월", "2월", "3월", "4월"])
         period2 = st.sidebar.multiselect("📅 [비교 2] 비교 기간 (예: 5~6월)", month_list, default=["5월", "6월", "7월", "8월"])
-        
         p1_ints = [int(m.replace('월', '')) for m in period1]
         p2_ints = [int(m.replace('월', '')) for m in period2]
         store_df = base_df[base_df['거래처(부서)'] == selected_store]
         header_subtitle = f"단일 매장 기간 비교 모드 | 대상 지점: {selected_store}"
-        
         v1_df = store_df[store_df['월'].isin(p1_ints)] if p1_ints else store_df.iloc[0:0]
         v2_df = store_df[store_df['월'].isin(p2_ints)] if p2_ints else store_df.iloc[0:0]
-        
         t1 = f"📅 {', '.join(period1)}" if period1 else "기간 1 미선택"
         t2 = f"📅 {', '.join(period2)}" if period2 else "기간 2 미선택"
-        
         views.append({"title": f"[{selected_store}] {t1}", "df": v1_df})
         views.append({"title": f"[{selected_store}] {t2}", "df": v2_df})
 
@@ -198,11 +191,9 @@ else:
         selected_stores = st.sidebar.multiselect("🏪 나란히 비교할 가맹점 (다중 선택)", store_list, default=store_list[:2] if store_list else [])
         selected_months = st.sidebar.multiselect("📅 전체 조회 기간 (월별)", month_list, default=[])
         p_ints = [int(m.replace('월', '')) for m in selected_months]
-        
         time_filtered_df = base_df[base_df['월'].isin(p_ints)] if p_ints else base_df
         period_text = ", ".join(selected_months) if selected_months else "전체 기간 (2026년)"
         header_subtitle = f"2개이상 매장 비교 모드 | 대상: {len(selected_stores)}개 지점 | 기간: {period_text}"
-        
         for store in selected_stores:
             views.append({"title": f"🏪 {store} 실적", "df": time_filtered_df[time_filtered_df['거래처(부서)'] == store]})
 
@@ -280,7 +271,6 @@ else:
                     atv = (total_sales / total_receipts) if total_receipts > 0 else 0
                     avg_margin_rate = (lens_df['총마진'].sum() / lens_sales * 100) if lens_sales > 0 else 0
                     
-                    # 🔥 [수정] 단일 매장 조회일 때 5칸으로 예쁘게 배치!
                     if compare_mode == "단일 매장 조회":
                         kpi_cols = st.columns(5)
                         with kpi_cols[0]: st.markdown(f'<div class="metric-card border-indigo"><div class="metric-label">총 매출액</div><div class="metric-value">{int(total_sales):,} 원</div></div>', unsafe_allow_html=True)
@@ -289,7 +279,6 @@ else:
                         with kpi_cols[3]: st.markdown(f'<div class="metric-card border-amber"><div class="metric-label">평균객단가</div><div class="metric-value">{int(atv):,} 원</div></div>', unsafe_allow_html=True)
                         with kpi_cols[4]: st.markdown(f'<div class="metric-card border-violet"><div class="metric-label">조회 품목 수</div><div class="metric-value" style="font-size:16px;">{v_df["상품명2"].nunique():,} 개</div></div>', unsafe_allow_html=True)
                     else:
-                        # 기존 2x2 방식 유지
                         kpi_c1, kpi_c2 = st.columns(2)
                         with kpi_c1:
                             st.markdown(f'<div class="metric-card border-indigo"><div class="metric-label">총 매출액</div><div class="metric-value">{int(total_sales):,} 원</div></div>', unsafe_allow_html=True)
@@ -312,13 +301,7 @@ else:
 
                         st.markdown(f"<div style='margin-top:20px; font-weight:bold; color:#334155;'>📈 카테고리별 {metric_name} 추이</div>", unsafe_allow_html=True)
                         fig_bar = px.bar(df_bar, x='Custom_Channel', y=y_col, text=y_col, color='Custom_Channel', color_discrete_map=CATEGORY_COLORS)
-                        fig_bar.update_traces(
-                            texttemplate=text_fmt, 
-                            textposition='outside', 
-                            width=0.5, 
-                            opacity=1.0,
-                            textfont=dict(size=14, color='#020617')
-                        )
+                        fig_bar.update_traces(texttemplate=text_fmt, textposition='outside', width=0.5, opacity=1.0, textfont=dict(size=14, color='#020617'))
                         fig_bar.update_layout(yaxis=dict(range=[0, max_y], showgrid=True, gridcolor='#f1f5f9', nticks=8), xaxis_title="", yaxis_title=y_title, margin=dict(l=10, r=10, t=25, b=10), showlegend=False, plot_bgcolor='white', paper_bgcolor='white')
                         st.plotly_chart(fig_bar, use_container_width=True)
 
@@ -335,12 +318,7 @@ else:
                         pie_data = pie_data[pie_data[pie_y] > 0]
                         if not pie_data.empty:
                             fig_pie = px.pie(pie_data, values=pie_y, names=pie_target, hole=0.5, color=pie_target, color_discrete_map=CATEGORY_COLORS)
-                            fig_pie.update_traces(
-                                textposition='inside', 
-                                textinfo='percent+label', 
-                                marker=dict(line=dict(color='#ffffff', width=2)),
-                                textfont=dict(size=15, color='#ffffff')
-                            )
+                            fig_pie.update_traces(textposition='inside', textinfo='percent+label', marker=dict(line=dict(color='#ffffff', width=2)), textfont=dict(size=15, color='#ffffff'))
                             fig_pie.update_layout(margin=dict(l=10, r=10, t=10, b=10), showlegend=False, plot_bgcolor='white', paper_bgcolor='white')
                             st.plotly_chart(fig_pie, use_container_width=True)
 
@@ -426,7 +404,6 @@ else:
                     c1, c2 = len(vc[vc['방문유형'] == '1회 방문']), len(vc[vc['방문유형'] == '2회 방문'])
                     c3, c4 = len(vc[vc['방문유형'] == '3회 방문']), len(vc[vc['방문유형'] == '4회 이상 방문'])
                     
-                    # 🔥 [수정] 단일 매장 조회일 때 4칸으로 예쁘게 나란히!
                     if compare_mode == "단일 매장 조회":
                         kpi_cols = st.columns(4)
                         with kpi_cols[0]: st.markdown(f'<div class="metric-card border-indigo"><div class="metric-label">1회 방문 고객</div><div class="metric-value">{c1:,} 명</div></div>', unsafe_allow_html=True)
@@ -460,13 +437,7 @@ else:
 
                         st.markdown(f"<div style='margin-top:20px; font-weight:bold; color:#334155;'>📈 카테고리별 {metric_name} 추이</div>", unsafe_allow_html=True)
                         fig_bar = px.bar(df_bar, x='Custom_Channel', y=y_col, text=y_col, color='Custom_Channel', color_discrete_map=CATEGORY_COLORS)
-                        fig_bar.update_traces(
-                            texttemplate=text_fmt, 
-                            textposition='outside', 
-                            width=0.5, 
-                            opacity=1.0,
-                            textfont=dict(size=14, color='#020617')
-                        )
+                        fig_bar.update_traces(texttemplate=text_fmt, textposition='outside', width=0.5, opacity=1.0, textfont=dict(size=14, color='#020617'))
                         fig_bar.update_layout(yaxis=dict(range=[0, max_y], showgrid=True, gridcolor='#f1f5f9', nticks=8), xaxis_title="", yaxis_title=y_title, margin=dict(l=10, r=10, t=25, b=10), showlegend=False, plot_bgcolor='white', paper_bgcolor='white')
                         st.plotly_chart(fig_bar, use_container_width=True)
 
@@ -483,12 +454,7 @@ else:
                         pie_data = pie_data[pie_data[pie_y] > 0]
                         if not pie_data.empty:
                             fig_pie = px.pie(pie_data, values=pie_y, names=pie_target, hole=0.5, color=pie_target, color_discrete_map=CATEGORY_COLORS)
-                            fig_pie.update_traces(
-                                textposition='inside', 
-                                textinfo='percent+label', 
-                                marker=dict(line=dict(color='#ffffff', width=2)),
-                                textfont=dict(size=15, color='#ffffff')
-                            )
+                            fig_pie.update_traces(textposition='inside', textinfo='percent+label', marker=dict(line=dict(color='#ffffff', width=2)), textfont=dict(size=15, color='#ffffff'))
                             fig_pie.update_layout(margin=dict(l=10, r=10, t=10, b=10), showlegend=False, plot_bgcolor='white', paper_bgcolor='white')
                             st.plotly_chart(fig_pie, use_container_width=True)
 
@@ -505,36 +471,48 @@ else:
                     st.dataframe(cust_table_df.style.format({'구매고객(명)': '{:,.0f}', '판매수량(개)': '{:,.0f}', '매출액(원)': '{:,.0f}'}), use_container_width=True, height=350)
 
     # ==========================================
-    # [탭 3] 리뉴얼 현황
+    # 🔥 [탭 3] 리뉴얼 현황 (4개 카테고리 독립 메뉴!)
     # ==========================================
     with tab_renewal:
-        st.markdown("<h3 style='color: #0f172a; margin-bottom: 5px;'>✨ 매장 리뉴얼 및 인테리어 현황</h3>", unsafe_allow_html=True)
-        shop_type = st.radio("🏢 매장 형태를 선택하세요:", ["단독샵 (Standalone)", "샵인샵 (Shop-in-Shop)"], horizontal=True)
+        st.markdown("<h3 style='color: #0f172a; margin-bottom: 5px;'>✨ 매장 리뉴얼 및 인테리어 컨설팅</h3>", unsafe_allow_html=True)
+        st.markdown("<p style='color: #ef4444; font-size: 14px; margin-bottom: 20px;'>💡 <b>Tip:</b> 사진에 마우스를 올리고 우측 상단 ⤢ 화살표 아이콘을 누르면 <b>전체 화면으로 크게 확대</b>됩니다!</p>", unsafe_allow_html=True)
+        
+        # 4개의 선택 카테고리
+        shop_type = st.radio("카테고리를 선택하세요:", ["🏢 단독샵", "🏪 샵인샵", "📐 3D 도면", "📄 견적서"], horizontal=True, label_visibility="collapsed")
         st.markdown("<hr style='margin-top:10px; margin-bottom:20px;'>", unsafe_allow_html=True)
         
-        st.markdown(f"#### 🖼️ [{shop_type}] 매장 고정 갤러리")
-        
-        if shop_type == "단독샵 (Standalone)":
+        # 선택한 카테고리에 따라 사진 방(폴더)과 가로 칸 수 설정
+        if shop_type == "🏢 단독샵":
             target_folder = os.path.join("images", "standalone")
-        else:
+            col_count = 3  # 보통 크기 (1줄에 3개)
+        elif shop_type == "🏪 샵인샵":
             target_folder = os.path.join("images", "shopinshop")
+            col_count = 3  # 보통 크기 (1줄에 3개)
+        elif shop_type == "📐 3D 도면":
+            target_folder = os.path.join("images", "3d")
+            col_count = 2  # 크게 (1줄에 2개)
+        else: # "📄 견적서"
+            target_folder = os.path.join("images", "quote")
+            col_count = 2  # 크게 (1줄에 2개)
             
+        st.markdown(f"#### {shop_type} 갤러리")
+        
         image_files = []
         if os.path.exists(target_folder):
             for ext in ('*.png', '*.jpg', '*.jpeg', '*.PNG', '*.JPG', '*.JPEG'):
                 image_files.extend(glob.glob(os.path.join(target_folder, ext)))
                 
         if image_files:
-            cols = st.columns(3)
+            cols = st.columns(col_count)
             for i, img_path in enumerate(image_files):
-                with cols[i % 3]:
+                with cols[i % col_count]:
                     st.image(img_path, use_container_width=True)
         else:
-            st.info(f"💡 현재 '{shop_type}'에 등록된 고정 사진이 없습니다. 깃허브의 '{target_folder}' 폴더에 사진을 업로드해 주세요!")
+            st.info(f"💡 현재 '{shop_type}' 카테고리에 사진이 없습니다. 깃허브의 '{target_folder}' 폴더에 사진을 업로드해 주세요!")
 
         st.markdown("<br><hr style='border: 1px dashed #cbd5e1;'><br>", unsafe_allow_html=True)
         
-        st.markdown("#### 📸 추가 현장 사진 업로드")
+        st.markdown("#### 📸 추가 현장 사진 업로드 (일회성)")
         uploaded_images = st.file_uploader(
             "현장에서 추가로 띄워서 보여주고 싶은 사진이 있다면 끌어다 놓으세요!", 
             type=['png', 'jpg', 'jpeg'], 
