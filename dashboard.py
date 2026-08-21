@@ -144,16 +144,12 @@ def load_data(uploaded_files):
         else: return '컬러'
     combined_df['Color_Type'] = combined_df.apply(map_color_type, axis=1)
 
-    # 🔥 [추가] 근시용 / 난시용 구별 마법!
     def map_vision_type(row):
         name = str(row['상품명2']).upper()
-        # 부대용품은 근시/난시 해당 없음 처리
         if row['Color_Type'] == '해당없음(부대용품)' or '기타' in row['Custom_Channel']:
             return '해당없음'
-        # 이름에 난시, 토릭 관련 단어가 있으면 난시용
         if any(kw in name for kw in ['난시', '토릭', '토리카', 'TORIC']):
             return '난시용'
-        # 그 외 렌즈는 근시용(일반)
         return '근시용'
     combined_df['Vision_Type'] = combined_df.apply(map_vision_type, axis=1)
     
@@ -235,7 +231,6 @@ else:
     color_options = ['컬러', '투명']
     selected_color_types = st.sidebar.multiselect("👁️ 렌즈 종류", color_options, default=[])
 
-    # 🔥 [추가] 사이드바에 근시/난시 필터 추가
     vision_options = ['근시용', '난시용']
     selected_vision_types = st.sidebar.multiselect("👓 도수 타입 (근시/난시)", vision_options, default=[])
 
@@ -313,10 +308,11 @@ else:
                     atv = (total_sales / total_receipts) if total_receipts > 0 else 0
                     avg_margin_rate = (lens_df['총마진'].sum() / lens_sales * 100) if lens_sales > 0 else 0
                     
+                    # 🔥 [수정] '판매수량' 대신 '총 방문 고객 수' 표시되도록 적용
                     if compare_mode == "단일 매장 조회":
                         kpi_cols = st.columns(5)
                         with kpi_cols[0]: st.markdown(f'<div class="metric-card border-indigo"><div class="metric-label">총 매출액</div><div class="metric-value">{int(total_sales):,} 원</div></div>', unsafe_allow_html=True)
-                        with kpi_cols[1]: st.markdown(f'<div class="metric-card border-emerald"><div class="metric-label">총 판매수량</div><div class="metric-value">{int(total_qty):,} 개</div></div>', unsafe_allow_html=True)
+                        with kpi_cols[1]: st.markdown(f'<div class="metric-card border-emerald"><div class="metric-label">총 방문 고객 수</div><div class="metric-value">{int(total_receipts):,} 명(건)</div></div>', unsafe_allow_html=True)
                         with kpi_cols[2]: st.markdown(f'<div class="metric-card border-pink"><div class="metric-label">마진율(렌즈)</div><div class="metric-value">{avg_margin_rate:.1f} %</div></div>', unsafe_allow_html=True)
                         with kpi_cols[3]: st.markdown(f'<div class="metric-card border-amber"><div class="metric-label">평균객단가</div><div class="metric-value">{int(atv):,} 원</div></div>', unsafe_allow_html=True)
                         with kpi_cols[4]: st.markdown(f'<div class="metric-card border-violet"><div class="metric-label">조회 품목 수</div><div class="metric-value" style="font-size:16px;">{v_df["상품명2"].nunique():,} 개</div></div>', unsafe_allow_html=True)
@@ -326,7 +322,7 @@ else:
                             st.markdown(f'<div class="metric-card border-indigo"><div class="metric-label">총 매출액</div><div class="metric-value">{int(total_sales):,} 원</div></div>', unsafe_allow_html=True)
                             st.markdown(f'<div class="metric-card border-pink"><div class="metric-label">마진율(렌즈)</div><div class="metric-value">{avg_margin_rate:.1f} %</div></div>', unsafe_allow_html=True)
                         with kpi_c2:
-                            st.markdown(f'<div class="metric-card border-emerald"><div class="metric-label">총 판매수량</div><div class="metric-value">{int(total_qty):,} 개</div></div>', unsafe_allow_html=True)
+                            st.markdown(f'<div class="metric-card border-emerald"><div class="metric-label">총 방문 고객 수</div><div class="metric-value">{int(total_receipts):,} 명(건)</div></div>', unsafe_allow_html=True)
                             st.markdown(f'<div class="metric-card border-amber"><div class="metric-label">평균객단가(전체)</div><div class="metric-value">{int(atv):,} 원</div></div>', unsafe_allow_html=True)
                         st.markdown(f'<div class="metric-card border-violet"><div class="metric-label">조회 품목 수</div><div class="metric-value" style="font-size:16px;">{v_df["상품명2"].nunique():,} 개 품목 판매됨</div></div>', unsafe_allow_html=True)
 
@@ -370,7 +366,6 @@ else:
                     if show_margin: draw_view_chart("마진율", global_max_margin)
 
                     st.markdown("<br><h4 style='color:#334155;'>📋 상세 실적 현황</h4>", unsafe_allow_html=True)
-                    # 🔥 [수정] 표에도 '도수타입' 열 추가
                     table_df = v_df.groupby(['Custom_Channel', 'Color_Type', 'Vision_Type', 'Price_Type', '상품명2']).agg(판매수량=('합계', 'sum'), 매출액=('금액', 'sum'), 총마진=('총마진', 'sum')).reset_index().sort_values(by=['매출액'], ascending=[False])
                     table_df['총마진액(원)'] = table_df.apply(lambda x: '-' if x['Custom_Channel'] == '기타' else f"{int(x['총마진']):,}", axis=1)
                     table_df['마진율(%)'] = table_df.apply(lambda x: '-' if x['Custom_Channel'] == '기타' else f"{(x['총마진'] / x['매출액'] * 100 if x['매출액'] > 0 else 0):.1f}%", axis=1)
@@ -508,7 +503,6 @@ else:
                     if show_cust_margin: draw_cust_view_chart("마진율", g_max_c_margin)
 
                     st.markdown("<br><h4 style='color:#334155;'>📋 상세 구매 리스트</h4>", unsafe_allow_html=True)
-                    # 🔥 [수정] 표에도 '도수타입' 열 추가
                     cust_table_df = target_df.groupby(['Custom_Channel', 'Vision_Type', 'Price_Type', '상품명2']).agg(구매고객수=('고객명_정제', 'nunique'), 총판매수량=('합계', 'sum'), 매출액=('금액', 'sum'), 총마진=('총마진', 'sum')).reset_index().sort_values(by=['총판매수량'], ascending=[False])
                     cust_table_df['총마진액(원)'] = cust_table_df.apply(lambda x: '-' if x['Custom_Channel'] == '기타' else f"{int(x['총마진']):,}", axis=1)
                     cust_table_df['마진율(%)'] = cust_table_df.apply(lambda x: '-' if x['Custom_Channel'] == '기타' else f"{(x['총마진'] / x['매출액'] * 100 if x['매출액'] > 0 else 0):.1f}%", axis=1)
