@@ -97,9 +97,23 @@ def load_data(uploaded_files):
         
     combined_df = pd.concat(all_dfs, ignore_index=True)
 
+    # 🔥 [수정] 똑똑한 글로벌 투명/컬러 렌즈 사전 이식
+    def determine_clear(row):
+        g3, name = str(row['품목그룹3']), str(row['상품명2']).upper()
+        if ('투명' in g3 or '클리어' in name) and '컬러' not in g3: return True
+        
+        global_clear_kws = ['오아시스', '워터렌즈', '토탈원', '토탈1', '토탈14', '바이오트루', '모이스처', '모이스트', '트루아이', '나이트앤데이', '에어옵틱스', '울트라', '퓨어비전', '소프렌', '클라리티', '마이데이', '바이오피니티', '프로클리어', '아바이라', '프리시전', '원데이 아큐브', '데일리스']
+        global_color_kws = ['디파인', '프레쉬룩', '프레시룩', '일루미네이트', '내츄렐', '네츄렐', '레이셀', '컬러', 'CC']
+        
+        if any(k in name for k in global_clear_kws) and not any(c in name for c in global_color_kws):
+            return True
+        return False
+        
+    combined_df['is_clear_lens'] = combined_df.apply(determine_clear, axis=1)
+
     def map_channel(row):
         name, maker, g4 = str(row['상품명2']).upper(), str(row['생산업체']).upper(), str(row['품목그룹4']).upper()
-        if any(x in name for x in ['부대용품', '케이스', '리뉴', '바이오트루', '옵티프리', '액', '클렌미', '드롭', '더뷰', '세척기']): return '기타'
+        if any(x in name for x in ['케이스', '리뉴', '옵티프리', '액', '클렌미', '드롭', '더뷰', '세척기']) or '부대용품' in name or '부대용품' in str(row['품목그룹1']): return '기타'
         if '트루핏' in name: return 'PB'
         if any(m in maker for m in ['존슨', '바슈롬', '알콘', '쿠퍼', '인터로조', '한국알콘']) or '글로벌' in g4: return '글로벌'
         if 'PB' in g4 or '단종(PB)' in g4: return 'PB'
@@ -108,8 +122,9 @@ def load_data(uploaded_files):
     
     def map_price(row):
         g1, name, g3 = str(row['품목그룹1']), str(row['상품명2']).upper(), str(row['품목그룹3'])
-        is_clear = ('투명' in g3 or '클리어' in name) and '컬러' not in g3
-        if any(x in name for x in ['부대용품', '케이스', '리뉴', '바이오트루', '옵티프리', '액', '클렌미', '드롭', '더뷰', '세척기']): return '부대용품'
+        is_clear = row['is_clear_lens']
+        
+        if any(x in name for x in ['케이스', '리뉴', '옵티프리', '액', '클렌미', '드롭', '더뷰', '세척기']) or '부대용품' in name or '부대용품' in g1: return '부대용품'
         if '토리카' in name or any(x in g1 for x in ['4만원', '5만원', '6만원', '8만원', '9만원', '12만원']): return '4만원 이상'
         if '악마' in name or '클린핏' in name or ('30P' in name and not is_clear and row['Custom_Channel'] != '글로벌'): return '악마원데이'
         if '10P' in name: return '원데이 10P'
@@ -124,9 +139,8 @@ def load_data(uploaded_files):
     combined_df['Price_Type'] = combined_df.apply(map_price, axis=1)
     
     def map_color_type(row):
-        g3, name = str(row['품목그룹3']), str(row['상품명2']).upper()
         if '기타' in row['Custom_Channel'] or '부대용품' in row['Price_Type']: return '해당없음(부대용품)'
-        elif ('투명' in g3 or '클리어' in name) and '컬러' not in g3: return '투명'
+        if row['is_clear_lens']: return '투명'
         else: return '컬러'
     combined_df['Color_Type'] = combined_df.apply(map_color_type, axis=1)
     
@@ -208,10 +222,19 @@ else:
     color_options = ['컬러', '투명']
     selected_color_types = st.sidebar.multiselect("👁️ 렌즈 종류", color_options, default=[])
 
+    # 🔥 [수정] 클린핏 오투클리어가 '투명렌즈' 필터에도 마법처럼 불려오도록 세팅!
     for v in views:
-        if selected_channels: v['df'] = v['df'][v['df']['Custom_Channel'].isin(selected_channels)]
-        if selected_prices: v['df'] = v['df'][v['df']['Price_Type'].isin(selected_prices)]
-        if selected_color_types: v['df'] = v['df'][v['df']['Color_Type'].isin(selected_color_types)]
+        if selected_channels: 
+            v['df'] = v['df'][v['df']['Custom_Channel'].isin(selected_channels)]
+            
+        if selected_prices:
+            if '투명렌즈' in selected_prices:
+                v['df'] = v['df'][(v['df']['Price_Type'].isin(selected_prices)) | ((v['df']['상품명2'].str.contains('클린핏', na=False)) & (v['df']['상품명2'].str.contains('클리어', na=False)))]
+            else:
+                v['df'] = v['df'][v['df']['Price_Type'].isin(selected_prices)]
+                
+        if selected_color_types: 
+            v['df'] = v['df'][v['df']['Color_Type'].isin(selected_color_types)]
 
     st.markdown(f"""
     <div class="header-banner">
@@ -471,29 +494,27 @@ else:
                     st.dataframe(cust_table_df.style.format({'구매고객(명)': '{:,.0f}', '판매수량(개)': '{:,.0f}', '매출액(원)': '{:,.0f}'}), use_container_width=True, height=350)
 
     # ==========================================
-    # 🔥 [탭 3] 리뉴얼 현황 (4개 카테고리 독립 메뉴!)
+    # [탭 3] 리뉴얼 현황 
     # ==========================================
     with tab_renewal:
         st.markdown("<h3 style='color: #0f172a; margin-bottom: 5px;'>✨ 매장 리뉴얼 및 인테리어 컨설팅</h3>", unsafe_allow_html=True)
         st.markdown("<p style='color: #ef4444; font-size: 14px; margin-bottom: 20px;'>💡 <b>Tip:</b> 사진에 마우스를 올리고 우측 상단 ⤢ 화살표 아이콘을 누르면 <b>전체 화면으로 크게 확대</b>됩니다!</p>", unsafe_allow_html=True)
         
-        # 4개의 선택 카테고리
         shop_type = st.radio("카테고리를 선택하세요:", ["🏢 단독샵", "🏪 샵인샵", "📐 3D 도면", "📄 견적서"], horizontal=True, label_visibility="collapsed")
         st.markdown("<hr style='margin-top:10px; margin-bottom:20px;'>", unsafe_allow_html=True)
         
-        # 선택한 카테고리에 따라 사진 방(폴더)과 가로 칸 수 설정
         if shop_type == "🏢 단독샵":
             target_folder = os.path.join("images", "standalone")
-            col_count = 3  # 보통 크기 (1줄에 3개)
+            col_count = 3
         elif shop_type == "🏪 샵인샵":
             target_folder = os.path.join("images", "shopinshop")
-            col_count = 3  # 보통 크기 (1줄에 3개)
+            col_count = 3
         elif shop_type == "📐 3D 도면":
             target_folder = os.path.join("images", "3d")
-            col_count = 2  # 크게 (1줄에 2개)
-        else: # "📄 견적서"
+            col_count = 2
+        else: 
             target_folder = os.path.join("images", "quote")
-            col_count = 2  # 크게 (1줄에 2개)
+            col_count = 2
             
         st.markdown(f"#### {shop_type} 갤러리")
         
