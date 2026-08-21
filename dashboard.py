@@ -4,7 +4,6 @@ import plotly.express as px
 import os
 import glob
 
-
 # 1. 페이지 레이아웃 및 기본 설정
 st.set_page_config(page_title="렌즈미 매장 컨설팅 리포트", page_icon="images/logo.png", layout="wide", initial_sidebar_state="expanded")
 
