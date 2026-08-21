@@ -461,10 +461,16 @@ else:
         
         st.markdown(f"#### 🖼️ [{shop_type}] 매장 고정 갤러리")
         
+        # 🔥 [핵심 수정] 선택한 라디오 버튼에 따라 타겟 폴더를 다르게 설정합니다!
+        if shop_type == "단독샵 (Standalone)":
+            target_folder = os.path.join("images", "standalone")
+        else:
+            target_folder = os.path.join("images", "shopinshop")
+            
         image_files = []
-        if os.path.exists("images"):
+        if os.path.exists(target_folder):
             for ext in ('*.png', '*.jpg', '*.jpeg', '*.PNG', '*.JPG', '*.JPEG'):
-                image_files.extend(glob.glob(os.path.join("images", ext)))
+                image_files.extend(glob.glob(os.path.join(target_folder, ext)))
                 
         if image_files:
             cols = st.columns(3)
@@ -472,7 +478,7 @@ else:
                 with cols[i % 3]:
                     st.image(img_path, use_container_width=True)
         else:
-            st.info("💡 파이썬 코드 파일이 있는 곳에 **'images'** 라는 이름의 새 폴더를 만들고 사진들을 저장해두시면, 대시보드를 켤 때마다 여기에 자동으로 사진이 뜹니다!")
+            st.info(f"💡 현재 '{shop_type}'에 등록된 고정 사진이 없습니다. 깃허브의 '{target_folder}' 폴더에 사진을 업로드해 주세요!")
 
         st.markdown("<br><hr style='border: 1px dashed #cbd5e1;'><br>", unsafe_allow_html=True)
         
