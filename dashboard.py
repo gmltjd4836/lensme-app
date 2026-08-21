@@ -150,7 +150,6 @@ else:
     df, used_cust_col, used_phone_col = load_data(uploaded_files)
     
     st.sidebar.markdown("---")
-    # 🔥 [수정됨] 분석 모드 3가지로 개편
     compare_mode = st.sidebar.radio("🔍 컨설팅 분석 모드 선택", ["단일 매장 조회", "단일 매장 기간 비교", "2개 이상 매장 비교"])
     st.sidebar.markdown("---")
 
@@ -163,7 +162,6 @@ else:
     views = []
     header_subtitle = ""
 
-    # 🔥 1. 단일 매장 조회 (신규 추가)
     if compare_mode == "단일 매장 조회":
         selected_store = st.sidebar.selectbox("🏪 대상 가맹점 선택 (1개)", store_list)
         selected_months = st.sidebar.multiselect("📅 조회 기간 (월별)", month_list, default=[])
@@ -177,7 +175,6 @@ else:
         
         views.append({"title": f"🏪 {selected_store} 실적 ({period_text})", "df": time_filtered_df})
 
-    # 🔥 2. 단일 매장 기간 비교 (기존 유지)
     elif compare_mode == "단일 매장 기간 비교":
         selected_store = st.sidebar.selectbox("🏪 대상 가맹점 선택 (1개)", store_list)
         period1 = st.sidebar.multiselect("📅 [비교 1] 기준 기간 (예: 1~4월)", month_list, default=["1월", "2월", "3월", "4월"])
@@ -197,7 +194,6 @@ else:
         views.append({"title": f"[{selected_store}] {t1}", "df": v1_df})
         views.append({"title": f"[{selected_store}] {t2}", "df": v2_df})
 
-    # 🔥 3. 2개 이상 매장 비교 (기존 유지)
     else:
         selected_stores = st.sidebar.multiselect("🏪 나란히 비교할 가맹점 (다중 선택)", store_list, default=store_list[:2] if store_list else [])
         selected_months = st.sidebar.multiselect("📅 전체 조회 기간 (월별)", month_list, default=[])
@@ -284,15 +280,24 @@ else:
                     atv = (total_sales / total_receipts) if total_receipts > 0 else 0
                     avg_margin_rate = (lens_df['총마진'].sum() / lens_sales * 100) if lens_sales > 0 else 0
                     
-                    kpi_c1, kpi_c2 = st.columns(2)
-                    with kpi_c1:
-                        st.markdown(f'<div class="metric-card border-indigo"><div class="metric-label">총 매출액</div><div class="metric-value">{int(total_sales):,} 원</div></div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="metric-card border-pink"><div class="metric-label">마진율(렌즈)</div><div class="metric-value">{avg_margin_rate:.1f} %</div></div>', unsafe_allow_html=True)
-                    with kpi_c2:
-                        st.markdown(f'<div class="metric-card border-emerald"><div class="metric-label">총 판매수량</div><div class="metric-value">{int(total_qty):,} 개</div></div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="metric-card border-amber"><div class="metric-label">평균객단가(전체)</div><div class="metric-value">{int(atv):,} 원</div></div>', unsafe_allow_html=True)
-
-                    st.markdown(f'<div class="metric-card border-violet"><div class="metric-label">조회 품목 수</div><div class="metric-value" style="font-size:16px;">{v_df["상품명2"].nunique():,} 개 품목 판매됨</div></div>', unsafe_allow_html=True)
+                    # 🔥 [수정] 단일 매장 조회일 때 5칸으로 예쁘게 배치!
+                    if compare_mode == "단일 매장 조회":
+                        kpi_cols = st.columns(5)
+                        with kpi_cols[0]: st.markdown(f'<div class="metric-card border-indigo"><div class="metric-label">총 매출액</div><div class="metric-value">{int(total_sales):,} 원</div></div>', unsafe_allow_html=True)
+                        with kpi_cols[1]: st.markdown(f'<div class="metric-card border-emerald"><div class="metric-label">총 판매수량</div><div class="metric-value">{int(total_qty):,} 개</div></div>', unsafe_allow_html=True)
+                        with kpi_cols[2]: st.markdown(f'<div class="metric-card border-pink"><div class="metric-label">마진율(렌즈)</div><div class="metric-value">{avg_margin_rate:.1f} %</div></div>', unsafe_allow_html=True)
+                        with kpi_cols[3]: st.markdown(f'<div class="metric-card border-amber"><div class="metric-label">평균객단가</div><div class="metric-value">{int(atv):,} 원</div></div>', unsafe_allow_html=True)
+                        with kpi_cols[4]: st.markdown(f'<div class="metric-card border-violet"><div class="metric-label">조회 품목 수</div><div class="metric-value" style="font-size:16px;">{v_df["상품명2"].nunique():,} 개</div></div>', unsafe_allow_html=True)
+                    else:
+                        # 기존 2x2 방식 유지
+                        kpi_c1, kpi_c2 = st.columns(2)
+                        with kpi_c1:
+                            st.markdown(f'<div class="metric-card border-indigo"><div class="metric-label">총 매출액</div><div class="metric-value">{int(total_sales):,} 원</div></div>', unsafe_allow_html=True)
+                            st.markdown(f'<div class="metric-card border-pink"><div class="metric-label">마진율(렌즈)</div><div class="metric-value">{avg_margin_rate:.1f} %</div></div>', unsafe_allow_html=True)
+                        with kpi_c2:
+                            st.markdown(f'<div class="metric-card border-emerald"><div class="metric-label">총 판매수량</div><div class="metric-value">{int(total_qty):,} 개</div></div>', unsafe_allow_html=True)
+                            st.markdown(f'<div class="metric-card border-amber"><div class="metric-label">평균객단가(전체)</div><div class="metric-value">{int(atv):,} 원</div></div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="metric-card border-violet"><div class="metric-label">조회 품목 수</div><div class="metric-value" style="font-size:16px;">{v_df["상품명2"].nunique():,} 개 품목 판매됨</div></div>', unsafe_allow_html=True)
 
                     def draw_view_chart(metric_name, max_y):
                         if metric_name == "마진율":
@@ -421,13 +426,21 @@ else:
                     c1, c2 = len(vc[vc['방문유형'] == '1회 방문']), len(vc[vc['방문유형'] == '2회 방문'])
                     c3, c4 = len(vc[vc['방문유형'] == '3회 방문']), len(vc[vc['방문유형'] == '4회 이상 방문'])
                     
-                    kpi_c1, kpi_c2 = st.columns(2)
-                    with kpi_c1:
-                        st.markdown(f'<div class="metric-card border-indigo"><div class="metric-label">1회 방문 고객</div><div class="metric-value">{c1:,} 명</div></div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="metric-card border-amber"><div class="metric-label">3회 방문 고객</div><div class="metric-value">{c3:,} 명</div></div>', unsafe_allow_html=True)
-                    with kpi_c2:
-                        st.markdown(f'<div class="metric-card border-emerald"><div class="metric-label">2회 방문 고객</div><div class="metric-value">{c2:,} 명</div></div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="metric-card border-violet"><div class="metric-label">4회 이상 고객</div><div class="metric-value">{c4:,} 명</div></div>', unsafe_allow_html=True)
+                    # 🔥 [수정] 단일 매장 조회일 때 4칸으로 예쁘게 나란히!
+                    if compare_mode == "단일 매장 조회":
+                        kpi_cols = st.columns(4)
+                        with kpi_cols[0]: st.markdown(f'<div class="metric-card border-indigo"><div class="metric-label">1회 방문 고객</div><div class="metric-value">{c1:,} 명</div></div>', unsafe_allow_html=True)
+                        with kpi_cols[1]: st.markdown(f'<div class="metric-card border-emerald"><div class="metric-label">2회 방문 고객</div><div class="metric-value">{c2:,} 명</div></div>', unsafe_allow_html=True)
+                        with kpi_cols[2]: st.markdown(f'<div class="metric-card border-amber"><div class="metric-label">3회 방문 고객</div><div class="metric-value">{c3:,} 명</div></div>', unsafe_allow_html=True)
+                        with kpi_cols[3]: st.markdown(f'<div class="metric-card border-violet"><div class="metric-label">4회 이상 고객</div><div class="metric-value">{c4:,} 명</div></div>', unsafe_allow_html=True)
+                    else:
+                        kpi_c1, kpi_c2 = st.columns(2)
+                        with kpi_c1:
+                            st.markdown(f'<div class="metric-card border-indigo"><div class="metric-label">1회 방문 고객</div><div class="metric-value">{c1:,} 명</div></div>', unsafe_allow_html=True)
+                            st.markdown(f'<div class="metric-card border-amber"><div class="metric-label">3회 방문 고객</div><div class="metric-value">{c3:,} 명</div></div>', unsafe_allow_html=True)
+                        with kpi_c2:
+                            st.markdown(f'<div class="metric-card border-emerald"><div class="metric-label">2회 방문 고객</div><div class="metric-value">{c2:,} 명</div></div>', unsafe_allow_html=True)
+                            st.markdown(f'<div class="metric-card border-violet"><div class="metric-label">4회 이상 고객</div><div class="metric-value">{c4:,} 명</div></div>', unsafe_allow_html=True)
 
                     target_df = pv['target_df']
                     if target_df.empty:
